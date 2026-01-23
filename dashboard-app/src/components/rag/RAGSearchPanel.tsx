@@ -15,8 +15,8 @@ interface Message {
     timestamp: Date;
 }
 
-export function RAGSearchPanel() {
-    const [query, setQuery] = useState('');
+export function RAGSearchPanel({ initialQuery }: { initialQuery?: string }) {
+    const [query, setQuery] = useState(initialQuery || '');
     const [isLoading, setIsLoading] = useState(false);
     const [messages, setMessages] = useState<Message[]>([
         {
@@ -28,12 +28,21 @@ export function RAGSearchPanel() {
     ]);
 
     const scrollRef = useRef<HTMLDivElement>(null);
+    const hasAutoSearched = useRef(false);
 
     useEffect(() => {
         if (scrollRef.current) {
             scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
         }
     }, [messages]);
+
+    // Handle initial search from global search
+    useEffect(() => {
+        if (initialQuery && initialQuery.length > 3 && !hasAutoSearched.current) {
+            hasAutoSearched.current = true;
+            handleSearch();
+        }
+    }, []);
 
     const handleSearch = async (e?: React.FormEvent) => {
         e?.preventDefault();

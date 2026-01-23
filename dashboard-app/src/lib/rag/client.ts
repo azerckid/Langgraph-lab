@@ -19,7 +19,7 @@ export const db = createClient({
 // Gemini 클라이언트
 const genAI = new GoogleGenerativeAI(GEMINI_KEY || '');
 const embeddingModel = genAI.getGenerativeModel({ model: 'text-embedding-004' });
-const chatModel = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' }); // or whichever model we chose (2.5 flash mentioned in plan)
+// 2.5 Flash is not yet available in all regions, using 1.5 Flash as stable default or 2.0 Flash if preferred.
 
 // 2.5 Flash가 아직 사용할 수 없는 경우를 대비해 1.5 Flash 또는 2.0 Flash 사용
 // 계획서에는 "Gemini 2.5 Flash"로 되어 있으나, 실제 API 모델명은 'gemini-1.5-flash' 또는 'gemini-2.0-flash-exp' 일 수 있음.
