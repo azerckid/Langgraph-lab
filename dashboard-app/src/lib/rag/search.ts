@@ -26,7 +26,7 @@ export async function searchAndAnswer(query: string): Promise<RAGResponse> {
     // 2. Turso 벡터 검색
     // vector_top_k 사용 (vector extension 필요)
     // 768차원 벡터
-    const vectorQuery = `[${embedding.join(',')}]`;
+    const vectorQuery = new Float32Array(embedding).buffer;
 
     // Turso(libSQL) vector search query
     // 정확한 구문은 extension 버전에 따라 다를 수 있으나, 일반적으로 vector_top_k 인덱스 활용
@@ -46,11 +46,11 @@ export async function searchAndAnswer(query: string): Promise<RAGResponse> {
   `;
 
     // 주의: @libsql/client의 execute는 바이너리 벡터 파라미터를 직접 지원하지 않을 수 있음.
-    // 이 경우 vector literal string으로 변환해서 전달하는 것이 안전함.
+    // 브라우저에서는 ArrayBuffer/Uint8Array를 넘겨야 할 수도 있습니다.
 
     const results = await db.execute({
         sql: sql,
-        args: [vectorQuery] // vector string passing
+        args: [vectorQuery] // passing as Buffer/ArrayBuffer
     });
 
     const sources: SearchResult[] = results.rows.map((row: any) => ({
