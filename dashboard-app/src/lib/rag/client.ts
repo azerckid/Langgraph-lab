@@ -46,3 +46,14 @@ export const generateAnswer = async (prompt: string) => {
         throw error;
     }
 };
+
+export const generateAnswerStream = async (prompt: string) => {
+    try {
+        const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
+        const result = await model.generateContentStream(prompt);
+        return result.stream;
+    } catch (error) {
+        console.error('Error generating streaming answer:', error);
+        throw error;
+    }
+};

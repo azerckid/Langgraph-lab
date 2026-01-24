@@ -4,7 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Loader2, Send, Bot, User, FileText, Search, Sparkles } from "lucide-react";
-import { searchAndAnswer, type RAGResponse, type SearchResult } from '../../lib/rag/search';
+import { searchAndAnswerStream, type SearchResult } from '../../lib/rag/search';
 import Markdown from 'markdown-to-jsx';
 
 interface Message {
@@ -46,12 +46,13 @@ export function RAGSearchPanel({ initialQuery }: { initialQuery?: string }) {
 
     const handleSearch = async (e?: React.FormEvent) => {
         e?.preventDefault();
-        if (!query.trim() || isLoading) return;
+        const currentQuery = query.trim();
+        if (!currentQuery || isLoading) return;
 
         const userMessage: Message = {
             id: Date.now().toString(),
             role: 'user',
-            content: query,
+            content: currentQuery,
             timestamp: new Date()
         };
 
@@ -59,28 +60,43 @@ export function RAGSearchPanel({ initialQuery }: { initialQuery?: string }) {
         setQuery('');
         setIsLoading(true);
 
+        // Create a temporary ID for the bot message to update it in real-time
+        const botMessageId = (Date.now() + 1).toString();
+
+        // Add initial empty bot message
+        setMessages(prev => [...prev, {
+            id: botMessageId,
+            role: 'assistant',
+            content: '',
+            timestamp: new Date()
+        }]);
+
         try {
-            // RAG 검색 및 답변 생성
-            const result: RAGResponse = await searchAndAnswer(userMessage.content);
+            // RAG 검색 및 스트리밍 답변 생성
+            let fullAnswer = '';
+            const { sources } = await searchAndAnswerStream(currentQuery, (chunk) => {
+                fullAnswer += chunk;
+                setMessages(prev => prev.map(msg =>
+                    msg.id === botMessageId
+                        ? { ...msg, content: fullAnswer }
+                        : msg
+                ));
+            });
 
-            const botMessage: Message = {
-                id: (Date.now() + 1).toString(),
-                role: 'assistant',
-                content: result.answer,
-                sources: result.sources,
-                timestamp: new Date()
-            };
+            // Final update with sources
+            setMessages(prev => prev.map(msg =>
+                msg.id === botMessageId
+                    ? { ...msg, sources }
+                    : msg
+            ));
 
-            setMessages(prev => [...prev, botMessage]);
         } catch (error) {
             console.error('RAG Error:', error);
-            const errorMessage: Message = {
-                id: (Date.now() + 1).toString(),
-                role: 'assistant',
-                content: "Sorry, I encountered an error while processing your request. Please check your API keys or try again later.",
-                timestamp: new Date()
-            };
-            setMessages(prev => [...prev, errorMessage]);
+            setMessages(prev => prev.map(msg =>
+                msg.id === botMessageId
+                    ? { ...msg, content: "Sorry, I encountered an error while processing your request. Please check your API keys or try again later." }
+                    : msg
+            ));
         } finally {
             setIsLoading(false);
         }
@@ -95,7 +111,7 @@ export function RAGSearchPanel({ initialQuery }: { initialQuery?: string }) {
                     </div>
                     <div>
                         <CardTitle className="text-lg">AI Documentation Assistant</CardTitle>
-                        <CardDescription className="text-xs">Powered by Gemini 2.5 & Turso Vector Search</CardDescription>
+                        <CardDescription className="text-xs">Powered by Gemini 2.0 Flash & Turso Vector Search</CardDescription>
                     </div>
                 </div>
             </CardHeader>
@@ -120,7 +136,7 @@ export function RAGSearchPanel({ initialQuery }: { initialQuery?: string }) {
                                 >
                                     {msg.role === 'assistant' ? (
                                         <div className="prose prose-sm dark:prose-invert max-w-none prose-p:leading-relaxed prose-pre:bg-background/50">
-                                            <Markdown>{msg.content}</Markdown>
+                                            <Markdown>{msg.content || '...'}</Markdown>
                                         </div>
                                     ) : (
                                         <p>{msg.content}</p>
@@ -129,7 +145,7 @@ export function RAGSearchPanel({ initialQuery }: { initialQuery?: string }) {
 
                                 {/* Sources Section */}
                                 {msg.sources && msg.sources.length > 0 && (
-                                    <div className="w-full mt-1 space-y-2">
+                                    <div className="w-full mt-1 space-y-2 animate-in fade-in slide-in-from-top-1 duration-500">
                                         <p className="text-[10px] font-semibold text-muted-foreground uppercase flex items-center gap-1">
                                             <Search className="h-3 w-3" />
                                             References
@@ -156,14 +172,14 @@ export function RAGSearchPanel({ initialQuery }: { initialQuery?: string }) {
                         </div>
                     ))}
 
-                    {isLoading && (
+                    {isLoading && !messages[messages.length - 1]?.content && (
                         <div className="flex gap-3">
                             <div className="mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-full border bg-muted">
                                 <Bot className="h-4 w-4" />
                             </div>
                             <div className="rounded-xl bg-muted/50 p-4 border border-muted-foreground/10 flex items-center gap-3">
                                 <Loader2 className="h-4 w-4 animate-spin text-primary" />
-                                <span className="text-sm text-muted-foreground animate-pulse">Thinking...</span>
+                                <span className="text-sm text-muted-foreground animate-pulse">Searching knowledge base...</span>
                             </div>
                         </div>
                     )}
