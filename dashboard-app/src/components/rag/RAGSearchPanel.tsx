@@ -30,11 +30,40 @@ export function RAGSearchPanel({ initialQuery }: { initialQuery?: string }) {
     const scrollRef = useRef<HTMLDivElement>(null);
     const hasAutoSearched = useRef(false);
 
+    // Typewriter effect state
+    const typewriterQueue = useRef<string[]>([]);
+    const currentBotMessageId = useRef<string | null>(null);
+    const typingIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
+    // Auto-scroll logic
     useEffect(() => {
         if (scrollRef.current) {
             scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
         }
     }, [messages]);
+
+    // Drain typewriter queue
+    useEffect(() => {
+        const processQueue = () => {
+            if (typewriterQueue.current.length > 0 && currentBotMessageId.current) {
+                const char = typewriterQueue.current.shift();
+                if (char !== undefined) {
+                    setMessages(prev => prev.map(msg =>
+                        msg.id === currentBotMessageId.current
+                            ? { ...msg, content: msg.content + char }
+                            : msg
+                    ));
+                }
+            }
+        };
+
+        // Speed: 30ms per character for an organic feel
+        typingIntervalRef.current = setInterval(processQueue, 30);
+
+        return () => {
+            if (typingIntervalRef.current) clearInterval(typingIntervalRef.current);
+        };
+    }, []);
 
     // Handle initial search from global search
     useEffect(() => {
@@ -56,12 +85,15 @@ export function RAGSearchPanel({ initialQuery }: { initialQuery?: string }) {
             timestamp: new Date()
         };
 
+        // Reset typewriter
+        typewriterQueue.current = [];
+
         setMessages(prev => [...prev, userMessage]);
         setQuery('');
         setIsLoading(true);
 
-        // Create a temporary ID for the bot message to update it in real-time
         const botMessageId = (Date.now() + 1).toString();
+        currentBotMessageId.current = botMessageId;
 
         // Add initial empty bot message
         setMessages(prev => [...prev, {
@@ -73,17 +105,13 @@ export function RAGSearchPanel({ initialQuery }: { initialQuery?: string }) {
 
         try {
             // RAG 검색 및 스트리밍 답변 생성
-            let fullAnswer = '';
             const { sources } = await searchAndAnswerStream(currentQuery, (chunk) => {
-                fullAnswer += chunk;
-                setMessages(prev => prev.map(msg =>
-                    msg.id === botMessageId
-                        ? { ...msg, content: fullAnswer }
-                        : msg
-                ));
+                // Add new characters to the queue
+                typewriterQueue.current.push(...chunk.split(''));
             });
 
-            // Final update with sources
+            // Note: Sources are added to the state only after the logic completes
+            // The typing might still be ongoing. We'll set the sources when search is done.
             setMessages(prev => prev.map(msg =>
                 msg.id === botMessageId
                     ? { ...msg, sources }
@@ -92,6 +120,8 @@ export function RAGSearchPanel({ initialQuery }: { initialQuery?: string }) {
 
         } catch (error) {
             console.error('RAG Error:', error);
+            // If error, push error message to queue or set it directly
+            typewriterQueue.current = [];
             setMessages(prev => prev.map(msg =>
                 msg.id === botMessageId
                     ? { ...msg, content: "Sorry, I encountered an error while processing your request. Please check your API keys or try again later." }
@@ -136,7 +166,7 @@ export function RAGSearchPanel({ initialQuery }: { initialQuery?: string }) {
                                 >
                                     {msg.role === 'assistant' ? (
                                         <div className="prose prose-sm dark:prose-invert max-w-none prose-p:leading-relaxed prose-pre:bg-background/50">
-                                            <Markdown>{msg.content || '...'}</Markdown>
+                                            <Markdown>{msg.content || (isLoading && msg.id === currentBotMessageId.current ? '' : '...')}</Markdown>
                                         </div>
                                     ) : (
                                         <p>{msg.content}</p>
@@ -172,7 +202,7 @@ export function RAGSearchPanel({ initialQuery }: { initialQuery?: string }) {
                         </div>
                     ))}
 
-                    {isLoading && !messages[messages.length - 1]?.content && (
+                    {isLoading && typewriterQueue.current.length === 0 && !messages[messages.length - 1]?.content && (
                         <div className="flex gap-3">
                             <div className="mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-full border bg-muted">
                                 <Bot className="h-4 w-4" />
