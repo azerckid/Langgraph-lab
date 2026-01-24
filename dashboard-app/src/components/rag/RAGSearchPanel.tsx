@@ -29,6 +29,7 @@ export function RAGSearchPanel({ initialQuery }: { initialQuery?: string }) {
 
     const scrollRef = useRef<HTMLDivElement>(null);
     const hasAutoSearched = useRef(false);
+    const lastHandledQuery = useRef<string>('');
 
     // Typewriter effect state
     const typewriterQueue = useRef<string[]>([]);
@@ -65,17 +66,18 @@ export function RAGSearchPanel({ initialQuery }: { initialQuery?: string }) {
         };
     }, []);
 
-    // Handle initial search from global search
+    // Handle search triggers from initialQuery prop
     useEffect(() => {
-        if (initialQuery && initialQuery.length > 3 && !hasAutoSearched.current) {
-            hasAutoSearched.current = true;
-            handleSearch();
+        if (initialQuery && initialQuery.length > 3 && initialQuery !== lastHandledQuery.current) {
+            lastHandledQuery.current = initialQuery;
+            setQuery(initialQuery);
+            handleSearch(undefined, initialQuery);
         }
-    }, []);
+    }, [initialQuery]);
 
-    const handleSearch = async (e?: React.FormEvent) => {
+    const handleSearch = async (e?: React.FormEvent, overrideQuery?: string) => {
         e?.preventDefault();
-        const currentQuery = query.trim();
+        const currentQuery = (overrideQuery || query).trim();
         if (!currentQuery || isLoading) return;
 
         const userMessage: Message = {
@@ -110,8 +112,7 @@ export function RAGSearchPanel({ initialQuery }: { initialQuery?: string }) {
                 typewriterQueue.current.push(...chunk.split(''));
             });
 
-            // Note: Sources are added to the state only after the logic completes
-            // The typing might still be ongoing. We'll set the sources when search is done.
+            // Final update with sources
             setMessages(prev => prev.map(msg =>
                 msg.id === botMessageId
                     ? { ...msg, sources }

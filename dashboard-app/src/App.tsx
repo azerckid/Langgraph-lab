@@ -62,6 +62,7 @@ const App = () => {
         selectedProject?.codes ? Object.keys(selectedProject.codes)[0] || '' : ''
     );
     const [searchQuery, setSearchQuery] = useState('');
+    const [submittedSearchQuery, setSubmittedSearchQuery] = useState('');
     const [activeTab, setActiveTab] = useState('overview');
 
     const filteredProjects = projectsData.filter(p =>
@@ -77,6 +78,7 @@ const App = () => {
 
     const handleGlobalSearch = (e: React.KeyboardEvent<HTMLInputElement>) => {
         if (e.key === 'Enter' && searchQuery.length > 3) {
+            setSubmittedSearchQuery(searchQuery);
             setActiveTab('ask-ai');
         }
     };
@@ -330,8 +332,12 @@ const App = () => {
                                                 </Card>
                                             </TabsContent>
 
-                                            <TabsContent value="ask-ai" className="m-0 border-none p-0 focus-visible:ring-0">
-                                                <RAGSearchPanel initialQuery={searchQuery} />
+                                            <TabsContent
+                                                value="ask-ai"
+                                                forceMount
+                                                className="m-0 border-none p-0 focus-visible:ring-0 data-[state=inactive]:hidden"
+                                            >
+                                                <RAGSearchPanel initialQuery={submittedSearchQuery} />
                                             </TabsContent>
                                         </div>
 
