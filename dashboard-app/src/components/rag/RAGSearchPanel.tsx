@@ -28,13 +28,12 @@ export function RAGSearchPanel({ initialQuery }: { initialQuery?: string }) {
     ]);
 
     const scrollRef = useRef<HTMLDivElement>(null);
-    const hasAutoSearched = useRef(false);
     const lastHandledQuery = useRef<string>('');
 
     // Typewriter effect state
     const typewriterQueue = useRef<string[]>([]);
     const currentBotMessageId = useRef<string | null>(null);
-    const typingIntervalRef = useRef<NodeJS.Timeout | null>(null);
+    const typingIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
     // Auto-scroll logic
     useEffect(() => {
